@@ -1,0 +1,59 @@
+[1mdiff --git a/src/main/java/com/ai/Resume/analyser/controller/appController.java b/src/main/java/com/ai/Resume/analyser/controller/appController.java[m
+[1mindex a090512..2b8af14 100644[m
+[1m--- a/src/main/java/com/ai/Resume/analyser/controller/appController.java[m
+[1m+++ b/src/main/java/com/ai/Resume/analyser/controller/appController.java[m
+[36m@@ -1,6 +1,5 @@[m
+ package com.ai.Resume.analyser.controller;[m
+ [m
+[31m-[m
+ import com.ai.Resume.analyser.service.appService;[m
+ import org.apache.tika.exception.TikaException;[m
+ import org.springframework.beans.factory.annotation.Autowired;[m
+[36m@@ -11,35 +10,35 @@[m [mimport org.springframework.web.multipart.MultipartFile;[m
+ import java.io.IOException;[m
+ [m
+ @RestController[m
+[31m-@RequestMapping("resumeAnalyserCore/service/v1")[m
+[32m+[m[32m@RequestMapping("/resumeAnalyserCore/service/v1")[m
+ public class appController {[m
+ [m
+     @Autowired[m
+     private appService appServices;[m
+ [m
+     @PostMapping("/extract")[m
+[31m-    public ResponseEntity<?> extract(@RequestParam String roles, @RequestParam MultipartFile file) throws TikaException, IOException, InterruptedException {[m
+[31m-        return appServices.extract(roles,file);[m
+[32m+[m[32m    public ResponseEntity<?> extract(@RequestParam("roles") String roles, @RequestParam("file") MultipartFile file)[m[41m [m
+[32m+[m[32m            throws TikaException, IOException, InterruptedException {[m
+[32m+[m[32m        return appServices.extract(roles, file);[m
+     }[m
+ [m
+     @GetMapping("/lastReport")[m
+[31m-    public ResponseEntity<?> lastReport(){[m
+[32m+[m[32m    public ResponseEntity<?> lastReport() {[m
+         return appServices.lastReport();[m
+     }[m
+ [m
+     @PostMapping("/logout")[m
+[31m-    public ResponseEntity<?> logout(){[m
+[31m-        return  appServices.logout();[m
+[32m+[m[32m    public ResponseEntity<?> logout() {[m
+[32m+[m[32m        return appServices.logout();[m
+     }[m
+ [m
+     @PostMapping("/deleteAccount")[m
+[31m-    public ResponseEntity<?> deleteAccount(){[m
+[31m-        return  appServices.deleteAccount();[m
+[32m+[m[32m    public ResponseEntity<?> deleteAccount() {[m
+[32m+[m[32m        return appServices.deleteAccount();[m
+     }[m
+ [m
+     @PostMapping("/isValid")[m
+[31m-    public ResponseEntity<?> tokenValidation(){[m
+[32m+[m[32m    public ResponseEntity<?> tokenValidation() {[m
+         return appServices.tokenValidation();[m
+     }[m
+[31m-[m
+[31m-}[m
+[32m+[m[32m}[m
+\ No newline at end of file[m
