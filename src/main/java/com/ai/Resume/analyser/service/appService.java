@@ -117,23 +117,29 @@ public class appService {
                 "}\n"
 
         )).build();
-        while (true) {
+        int attempts = 0;
+        results = null;
+        while (attempts < 3) {
             try {
                 GenerateContentConfig generateContentConfig = GenerateContentConfig.builder()
                         .temperature(0.0f)
                         .thinkingConfig(
                                 ThinkingConfig.builder()
                                         .thinkingLevel(ThinkingLevel.Known.HIGH)
-                                        .includeThoughts(true)
+                                        .includeThoughts(false)
                                         .build())
                         .build();
                 GenerateContentResponse response = client.models.generateContent("gemini-3.5-flash-lite", content, generateContentConfig);
                 results = response.text();
                 break;
             } catch (Exception e) {
+                attempts++;
+                System.out.println("GEMINI ERROR (attempt " + attempts + "): " + e);
                 Thread.sleep(1500);
-                System.out.println(e);
             }
+        }
+        if (results == null || results.isBlank()) {
+            return new ResponseEntity<>("AI service unavailable, please try again", HttpStatus.BAD_GATEWAY);
         }
         if ( results!= null && results.startsWith("```")) {
             int firstBrace = results.indexOf("{");
@@ -144,7 +150,21 @@ public class appService {
         }
 
         ObjectMapper objectMapper = new ObjectMapper();
-        resultsDto resultsDto = objectMapper.readValue(results, resultsDto.class);
+        objectMapper.configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        if (!results.trim().startsWith("{")) {
+            int fb = results.indexOf("{");
+            int lb = results.lastIndexOf("}");
+            if (fb != -1 && lb > fb) {
+                results = results.substring(fb, lb + 1);
+            }
+        }
+        resultsDto resultsDto;
+        try {
+            resultsDto = objectMapper.readValue(results, resultsDto.class);
+        } catch (Exception e) {
+            System.out.println("PARSE ERROR: " + e + " | raw: " + results);
+            return new ResponseEntity<>("Could not read AI response, please try again", HttpStatus.BAD_GATEWAY);
+        }
         if (resultsDto.getScore() != 0) {
             String uname = SecurityContextHolder.getContext().getAuthentication().getName();
             previousTable processedData = new previousTable(uname, resultsDto.getScore(), resultsDto.getAtsoptimizationscore(), roles, resultsDto.getPros(), resultsDto.getCons(), resultsDto.getSuggestions());
@@ -168,12 +188,10 @@ public class appService {
             // Job from API
             RestTemplate restTemplate = new RestTemplate();
             List<Job> jobs;
-            String url = "https://api.adzuna.com/v1/api/jobs/in/search/1?app_id=" + applicationId + "&app_key=" + applicationApiKey + "&what=" + previousTable.getRoles() + "&where=tamilnadu&content-type=application/json";
             try {
-                JobSearchResponse response = restTemplate.getForObject(url, JobSearchResponse.class);
-                jobs = response.getResults();
+                jobs = fetchJobs(previousTable.getRoles());
             } catch (Exception e) {
-                System.out.println(e.getMessage());
+                System.out.println("JSEARCH JOBS ERROR: " + e.getMessage());
                 resultsDto resultsDto = new resultsDto(previousTable.getScore(), previousTable.getAtsoptimizationscore(), previousTable.getPros(), previousTable.getCons(), previousTable.getSuggestions(), new ArrayList<>());
                 return ResponseEntity.ok(resultsDto);
             }
@@ -182,6 +200,46 @@ public class appService {
         } else {
             return new ResponseEntity<>("No previous Analysis", HttpStatus.NOT_FOUND);
         }
+    }
+
+    // Job suggestions from RapidAPI JSearch, mapped into the Job model the frontend already uses
+    private List<Job> fetchJobs(String role) throws IOException {
+        java.net.URI uri = org.springframework.web.util.UriComponentsBuilder
+                .fromUriString("https://jsearch.p.rapidapi.com/search")
+                .queryParam("query", role + " in India")
+                .queryParam("page", "1")
+                .queryParam("num_pages", "1")
+                .queryParam("country", "in")
+                .build().encode().toUri();
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-RapidAPI-Key", applicationApiKey);
+        headers.set("X-RapidAPI-Host", applicationId);
+        ResponseEntity<String> resp = new RestTemplate().exchange(uri, org.springframework.http.HttpMethod.GET,
+                new org.springframework.http.HttpEntity<>(headers), String.class);
+        com.fasterxml.jackson.databind.JsonNode data = new ObjectMapper().readTree(resp.getBody()).path("data");
+        List<Job> list = new ArrayList<>();
+        for (com.fasterxml.jackson.databind.JsonNode n : data) {
+            Job job = new Job();
+            job.setId(n.path("job_id").asText(""));
+            job.setTitle(n.path("job_title").asText(""));
+            String desc = n.path("job_description").asText("");
+            job.setDescription(desc.length() > 300 ? desc.substring(0, 300) + "..." : desc);
+            job.setRedirect_url(n.path("job_apply_link").asText(""));
+            Company company = new Company();
+            company.setDisplay_name(n.path("employer_name").asText(""));
+            job.setCompany(company);
+            Location loc = new Location();
+            String city = n.path("job_city").asText("");
+            String state = n.path("job_state").asText("");
+            loc.setDisplay_name((city + " " + state).trim());
+            job.setLocation(loc);
+            Category cat = new Category();
+            cat.setLabel(n.path("job_employment_type").asText(""));
+            job.setCategory(cat);
+            list.add(job);
+            if (list.size() >= 10) break;
+        }
+        return list;
     }
 
     public ResponseEntity<?> logout() {

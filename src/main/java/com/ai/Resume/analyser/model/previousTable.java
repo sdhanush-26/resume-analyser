@@ -23,15 +23,15 @@ public class previousTable {
     private String roles;
 
     @ElementCollection
-    @Column(length = 450)
+    @Column(length = 2000)
     private List<String> pros;
 
     @ElementCollection
-    @Column(length = 450)
+    @Column(length = 2000)
     private List<String> cons;
 
     @ElementCollection
-    @Column(length = 450)
+    @Column(length = 2000)
     private List<String> suggestions;
 
 }
